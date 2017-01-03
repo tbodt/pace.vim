@@ -1,0 +1,200 @@
+*pace.txt*	Measure the pace of typing (in Insert mode &c.)	2016-Oct-26
+
+Author:	Aliaksei Budavei (0x000c70 AT gmail DOT com)
+Copyleft ())
+
+
+See |load-vim-script| and |add-local-help| and |add-plugin|.
+
+
+==============================================================================
+1. Contents						*pace-contents*
+
+
+	1. Contents....................... |pace-contents|
+	2. Dependencies................... |pace-dependencies|
+	3. Demo........................... |pace-demo|
+	4. Functions & Commands........... |pace-functions| |pace-commands|
+	5. Variables...................... |pace-variables|
+	6. Caveats........................ |pace-caveats|
+	7. History........................ |pace-history|
+
+
+==============================================================================
+2. Dependencies						*pace-dependencies*
+
+
+	The features enabled: |+autocmd|, |+cmdline_info|, |+eval|,
+	|+reltime|, |+statusline|, |+user_commands|, and |+modify_fname|.
+
+	The 'eventignore' option should not include: all, |CursorMovedI|,
+	|InsertEnter|, and |InsertLeave|.
+
+	The format of |reltime()| is system-dependent, it is assumed that
+	[sec, ...] is returned.
+
+
+==============================================================================
+3. Demo							*pace-demo*
+
+
+	Preview this script in mock-action with a touch of rhyming: >
+
+		:echo finddir('demo', &runtimepath, -1)
+		:PaceDemo demo/demo.vim
+<
+
+==============================================================================
+4. Functions & Commands					*pace-functions*
+							*pace-commands*
+
+	Source the script and then call a function (or use a command).
+
+					*Pace_Load()* *:PaceOn* *:PaceOff*
+	Pace_Load() toggles an instance of either |ruler| or local to
+		window |statusline| filled with relevant data: >
+
+		:echo Pace_Load(1)
+		:PaceOn
+<
+		Restore global state and clean up: >
+
+		:echo Pace_Load(0)
+		:PaceOff
+<
+					*Pace_Dump()* *:PaceSum* *:PaceDump*
+	Pace_Dump() yields the summary of the whole, buffer total, and
+		hit instance: >
+
+		:echo join(sort(items(Pace_Dump(1))), "\n")
+		:PaceSum
+<
+		Fetch the copy of the log: >
+
+		:echo Pace_Dump(0)
+		:PaceDump
+<
+		where Pace_Dump(0)[x][y] (:PaceDump x y z)
+		[0][0]: [log_hits, all_hits, char, sec] (the whole) ~
+		[x][0]: [buf_hits, last_hit, char, sec] (buffer total) ~
+		[x][y]: [this_hit, hit_time, char, sec] (hit instance) ~
+
+					*:PaceSaveTo*
+		Carry over all data (consider |VimLeave| event): >
+
+		:echo writefile(['let g:pace_dump = '.string(Pace_Dump(0))],
+				\ 'path/to/dir/pace_'.localtime())
+		:PaceSaveTo path/to/dir
+<
+		Note: Substitute the real path for the `path/to/dir'.
+
+		In order to merge the new typing session data in the
+		old one, source a carryover file before this script,
+		e.g. (put in |vimrc|): >
+
+		if isdirectory(expand('path/to/dir'))
+			silent! execute 'source '
+			\ .split(expand('path/to/dir/pace_*'), "\n")[-1]
+		endif
+<
+
+					*Pace_Free()* *:PaceFree*
+	Pace_Free() (:PaceFree) clears out all local to script scope.
+
+
+==============================================================================
+5. Variables						*pace-variables*
+
+
+					*g:pace_amin*
+	g:pace_amin		the pace of all typing a minute.
+
+					*g:pace_info*
+	g:pace_info		current "tick, (char/sec), char, sec",
+					where `tick' is the time spent
+					advancing cursor (put in |ruler|
+					or |statusline|).
+
+					*g:pace_policy*
+	g:pace_policy		the sum of any of the following numbers,
+					plus 10000, in decimal notation:
+		0		mask |CursorMovedI| for all modes below;
+		1		poll |Insert-mode|;
+		2		poll |Replace-mode|;
+		4		poll |Virtual-Replace-mode|;
+		10		keep `reject' record (exclusive), i.e.
+					any pending collected data that
+					have missed |InsertLeave| event
+					and were not written to the log
+					(see <Ctrl-c> exiting in
+					|pace-caveats|);
+		20		keep `reject' record & mark (exclusive);
+		100		keep `null' record, i.e. no-characters-
+					typed entry (see the inserting
+					commands in |pace-caveats|);
+		1000		make |g:pace_info| amass all typing.
+
+		The range is 1[01][01][012][0-7] (preset to 10007).
+		The variable is timely removed, redefine it to alter
+		the current policy (all changes go to |:messages|).
+
+					*g:pace_dump*
+	g:pace_dump		the copy of the log left by |Pace_Free()|.
+
+					*g:pace_pool*
+	g:pace_pool		the sorted summary left by |Pace_Free()|.
+
+
+==============================================================================
+6. Caveats						*pace-caveats*
+
+
+	The script polls the motion of cursor, NOT the use of keystrokes.
+	A motion is regarded as a character typed; some special keys
+	|ins-special-keys| do not move cursor, others advance it over
+	several screen cells atomically, e.g.
+		(*) any |digraphs| that require three-to-six key presses
+		to produce a character, equate a character;
+		(*) typing a word, deleting it |i_CTRL-W|, typing it
+		again, equate the doubled word length plus one character.
+
+	The |inserting| commands (not `i') may account for a character.
+	The last line <EOL> character is never typed, see |eol|.
+
+	Transition from either |ruler| or |statusline| postpones stacking
+	|g:pace_info| until one begins typing; so does the initialisation
+	call of |Pace_Load()|, since there is nothing yet to be logged.
+
+	The global values of the following options are set:
+		(*) 'laststatus' to 1: to avoid an instance of having two
+			rulers set to work, after a vertical split;
+		(*) 'statusline': to take precedence of 'rulerformat';
+		(*) 'winheight' to 1 (in the demo script): to arrange all
+			preview windows compactly.
+
+	Leaving |Insert-mode| &c.  by means of <Ctrl-c> keystroke
+	|i_CTRL-C| ignores |InsertLeave| event.  To force it, and to
+	circumvent a contingent `reject' policy |g:pace_policy|, run: >
+
+		:doautocmd pace InsertLeave
+<
+	<Ctrl-o> keystroke fires |InsertLeave| event; switching between
+	|Insert| and |Replace| modes by means of <Insert> keystroke
+	|i_esc|, when either mode is masked, rejects the record.
+
+	By failing policy, the last `null' and/or `reject' record is
+	available between successive |InsertLeave| and |InsertEnter|
+	events (viz in |Normal-mode|); by agreeing policy, such record
+	shall be automatically entered on the next |InsertEnter| event.
+
+
+==============================================================================
+7. History						*pace-history*
+
+
+	2016-Oct-26	the initial release (v1.0)
+
+
+==============================================================================
+
+vim:tw=78:ts=8:ft=help
