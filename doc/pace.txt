@@ -1,4 +1,4 @@
-*pace.txt*	Measure the pace of typing (in Insert mode &c.)	2016-Oct-26
+*pace.txt*	Measure the pace of typing (in Insert mode &c.)	2016-Dec-26
 
 Author:	Aliaksei Budavei (0x000c70 AT gmail DOT com)
 Copyleft ())
@@ -36,7 +36,7 @@ See |load-vim-script| and |add-local-help| and |add-plugin|.
 
 ==============================================================================
 3. Demo							*pace-demo*
-
+							*:PaceDemo*
 
 	Preview this script in mock-action with a touch of rhyming: >
 
@@ -132,9 +132,12 @@ See |load-vim-script| and |add-local-help| and |add-plugin|.
 		100		keep `null' record, i.e. no-characters-
 					typed entry (see the inserting
 					commands in |pace-caveats|);
-		1000		make |g:pace_info| amass all typing.
+		1000		make |g:pace_info| amass all typing
+					(exclusive);
+		2000		make |g:pace_info| amass buffer typing
+					(exclusive).
 
-		The range is 1[01][01][012][0-7] (preset to 10007).
+		The range is 1[012][01][012][0-7] (preset to 10007).
 		The variable is timely removed, redefine it to alter
 		the current policy (all changes go to |:messages|).
 
@@ -166,8 +169,9 @@ See |load-vim-script| and |add-local-help| and |add-plugin|.
 	call of |Pace_Load()|, since there is nothing yet to be logged.
 
 	The global values of the following options are set:
-		(*) 'laststatus' to 1: to avoid an instance of having two
-			rulers set to work, after a vertical split;
+		(*) 'laststatus' to 1, if 0: to avoid an instance of
+			having two rulers set to work, after a vertical
+			split;
 		(*) 'statusline': to take precedence of 'rulerformat';
 		(*) 'winheight' to 1 (in the demo script): to arrange all
 			preview windows compactly.
@@ -192,7 +196,21 @@ See |load-vim-script| and |add-local-help| and |add-plugin|.
 7. History						*pace-history*
 
 
-	2016-Oct-26	the initial release (v1.0)
+	2016-Dec-26	The minor update (v1.1).
+
+				pace.txt:
+				The 'laststatus' option is set to 1, if 0
+				(the documentation is made to agree with
+				the script).
+
+				pace.vim:
+				The |g:pace_policy| variable allows a new
+				value (2000) to amass buffer typing.
+
+				The script-defined commands are supplied
+				with the `-bar' attribute |command-bar|.
+
+	2016-Oct-26	The initial release (v1.0).
 
 
 ==============================================================================

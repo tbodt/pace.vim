@@ -1,7 +1,7 @@
 " Description:	Measure the pace of typing (in Insert mode &c.)
 " Author:	Aliaksei Budavei (0x000c70 AT gmail DOT com)
-" Version:	1.0
-" Last Change:	2016-Oct-26
+" Version:	1.1
+" Last Change:	2016-Dec-26
 " Copyleft ())
 "
 " Usage:	List all doc/ locations:
@@ -83,8 +83,8 @@ endfunction	" On local machine reltime()[1] spits non-padded microseconds.
 " field that would hold the sum of all Normal-mode time and subtract its value
 " from reltime(first_hit, last_hit) in pace.leave().
 "
-" Moreover, `char' and `sec' must accommodate both single-run and all-runs
-" count policies (1000).
+" Moreover, `char' and `sec' must accommodate any run count policy: single
+" (0000), all (1000), or buffer (2000).
 
 function! s:pace.test(pass) abort					" {{{1
 	if exists('#pace#CursorMovedI#*')
@@ -97,7 +97,7 @@ function! s:pace.test(pass) abort					" {{{1
 
 	if exists('g:pace_policy') && type(g:pace_policy) == type(0)
 		if g:pace_policy != l:self.policy &&
-				\ g:pace_policy =~ '\<1[01][01][012][0-7]\>'
+				\ g:pace_policy =~ '\<1[012][01][012][0-7]\>'
 			echomsg split(expand('<sfile>'), '\.\.')[-1].': @'
 				\ .localtime().': g:pace_policy: '
 				\ .l:self.policy.'->'.g:pace_policy
@@ -110,7 +110,7 @@ function! s:pace.test(pass) abort					" {{{1
 	if &eventignore =~? '\v(all|insert(enter|leave)|cursormovedi)'
 		echomsg split(expand('<sfile>'), '\.\.')[-1].': @'
 			\ .localtime().': &eventignore mask'
-		return 1
+		return 1	" Return the same value as the following.
 	elseif !l:self.policy[4] ||
 		\ (v:insertmode == 'i' && l:self.policy[4] !~ '[1357]') ||
 		\ (v:insertmode == 'r' && l:self.policy[4] !~ '[2367]') ||
@@ -141,21 +141,21 @@ function! s:pace.leave() abort						" {{{1
 		let l:self.dump[l:self.buffer]	= [[0, 0, 0, 0]]
 	endif
 
-	" Update log hits and the whole count.
+	" Update the logged hits and the whole count.
 	let l:whole		= l:self.dump[0][0]
 	let l:whole[0:3]	+= [1, 0, l:self.char, l:self.sec]
 	unlet! g:pace_amin
 	let g:pace_amin		= l:self.div((l:whole[2] * 60), l:whole[3])
 	lockvar g:pace_amin g:pace_info
 
-	" Append new hit instance and fetch buffer total entry.
+	" Append a new hit instance and fetch the buffer total entry.
 	let l:total		= add(l:self.dump[l:self.buffer],
 			\ [(l:self.mark ? -l:whole[0] :	l:whole[0]),
 			\ l:self.begin[0], l:self.char, l:self.sec])[0]
 	let [l:total[0], l:total[1]]	= [(l:total[0] + 1), l:whole[0]]
 	let [l:total[2], l:total[3]]	+= [l:self.char, l:self.sec]
-	let [l:self.char, l:self.sec]	= [-1, -1]	" Invalidate count.
-	let l:self.pool		= {}			" Invalidate cache.
+	let [l:self.char, l:self.sec]	= [-1, -1]	" Invalidate the count.
+	let l:self.pool		= {}			" Invalidate the cache.
 endfunction
 
 function! s:pace.swap(buffer) abort					" {{{1
@@ -203,6 +203,16 @@ function! s:pace.enter() abort						" {{{1
 					\\ %-14.14(%l,%c%V%)\ %P rulerformat&
 	endif
 
+	let [l:self.cchar, l:self.ssec]	= l:self.policy[1] == 1	?
+		\ [l:self.dump[0][0][2], l:self.dump[0][0][3]]	:
+		\ l:self.policy[1] == 2 && has_key(l:self.dump, l:self.buffer)	?
+		\ [l:self.dump[l:self.buffer][0][2],
+		\ l:self.dump[l:self.buffer][0][3]]	:
+		\ [0, 0]
+	let l:self.dump[0][0][1]		+= 1	" All InsertEnter hits.
+	let [l:self.char, l:self.sec]		= [0, 0]
+	let [l:self.begin, l:self.break]	= [reltime(), reltime()]
+
 	if !exists('#pace#CursorMovedI#*')
 		autocmd pace CursorMovedI	* call s:pace.eval()
 	endif
@@ -210,12 +220,6 @@ function! s:pace.enter() abort						" {{{1
 	if !exists('#pace#InsertLeave#*')
 		autocmd pace InsertLeave	* call s:pace.leave()
 	endif
-
-	let [l:self.cchar, l:self.ssec]	= l:self.policy[1] != 1 ? [0, 0] :
-				\ [l:self.dump[0][0][2], l:self.dump[0][0][3]]
-	let l:self.dump[0][0][1]		+= 1	" All InsertEnter hits.
-	let [l:self.char, l:self.sec]		= [0, 0]
-	let [l:self.begin, l:self.break]	= [reltime(), reltime()]
 endfunction
 
 function! Pace_Load(entropy) abort					" {{{1
@@ -311,10 +315,10 @@ function! Pace_Free() abort						" {{{1
 endfunction
 
 " COMMANDS								" {{{1
-command! PaceOn		:echo Pace_Load(1)
-command! PaceOff	:echo Pace_Load(0)
-command! PaceSum	:echo join(sort(items(Pace_Dump(1))), "\n")
-command! -nargs=*
+command! -bar PaceOn	:echo Pace_Load(1)
+command! -bar PaceOff	:echo Pace_Load(0)
+command! -bar PaceSum	:echo join(sort(items(Pace_Dump(1))), "\n")
+command! -bar -nargs=*
 	\ PaceDump	:echo len([<f-args>]) == 3 ?
 	\ Pace_Dump(0)[[<f-args>][0]][[<f-args>][1]][[<f-args>][2]] :
 	\ len([<f-args>]) == 2 ?
@@ -322,14 +326,14 @@ command! -nargs=*
 	\ len([<f-args>]) == 1 ?
 	\ Pace_Dump(0)[[<f-args>][0]] :
 	\ Pace_Dump(0)
-command! PaceFree	:echo Pace_Free()
+command! -bar PaceFree	:echo Pace_Free()
 
 if has('modify_fname')
-command! -nargs=1 -complete=dir
+command! -bar -nargs=1 -complete=dir
 	\ PaceSaveTo	:echo writefile(['let g:pace_dump = '
 		\ .string(Pace_Dump(0))], fnamemodify(expand(<q-args>), ':p')
 		\ .'/pace_'.localtime())
-command! -nargs=1 -complete=file
+command! -bar -nargs=1 -complete=file
 	\ PaceDemo	:execute 'lcd '
 		\ .fnamemodify(expand(<q-args>), ':p:h').' | source '
 		\ .fnamemodify(expand(<q-args>), ':p')
